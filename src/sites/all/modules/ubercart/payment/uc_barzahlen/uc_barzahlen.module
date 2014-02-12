@@ -27,168 +27,195 @@ require_once 'api/loader.php';
 /**
  * Implements hook_menu().
  */
-function uc_barzahlen_menu() {
+function uc_barzahlen_menu()
+{
+    $items['uc_barzahlen/ipn'] = array(
+        'title' => 'Barzahlen IPN',
+        'page callback' => 'uc_barzahlen_ipn',
+        'access callback' => TRUE,
+        'type' => MENU_CALLBACK,
+        'file' => 'uc_barzahlen.pages.inc',
+    );
 
-  $items['uc_barzahlen/ipn'] = array(
-    'title' => 'Barzahlen IPN',
-    'page callback' => 'uc_barzahlen_ipn',
-    'access callback' => TRUE,
-    'type' => MENU_CALLBACK,
-    'file' => 'uc_barzahlen.pages.inc',
-  );
+    $items['uc_barzahlen/complete'] = array(
+        'title' => t('Order complete'),
+        'page callback' => 'uc_barzahlen_complete',
+        'access callback' => TRUE,
+        'type' => MENU_CALLBACK,
+        'file' => 'uc_barzahlen.pages.inc',
+    );
 
-  $items['uc_barzahlen/complete'] = array(
-    'title' => t('Order complete'),
-    'page callback' => 'uc_barzahlen_complete',
-    'access callback' => TRUE,
-    'type' => MENU_CALLBACK,
-    'file' => 'uc_barzahlen.pages.inc',
-  );
+    return $items;
+}
 
-  return $items;
+/**
+ * Implements hook_store_status().
+ */
+function uc_barzahlen_uc_store_status()
+{
+    try {
+        $shopId = variable_get('uc_barzahlen_shopid');
+        $paymentKey = variable_get('uc_barzahlen_paymentkey');
+        $checker = new Barzahlen_Version_Check($shopId, $paymentKey);
+        $response = $checker->checkVersion('Ubercart', '3', '1.0.2');
+
+        if ($response != false) {
+            $statuses[] = array(
+                'status' => 'warning',
+                'title' => 'Barzahlen Update',
+                'desc' => t('For the Barzahlen plugin is a new version (%s) available. Visit <a href="!url">Barzahlen</a> to download it.', array('%s' => (string) $response, '!url' => url('http://www.barzahlen.de/partner/integration/shopsysteme/13/ubercart'))),
+            );
+        }
+    } catch (Exception $e) {
+        watchdog('uc_barzahlen', $e, array(), WATCHDOG_ERROR);
+    }
+
+    if(isset($statuses)) {
+        return $statuses;
+    }
 }
 
 /**
  * Implements hook_uc_payment_method().
  */
-function uc_barzahlen_uc_payment_method() {
-  $title1 = '<img src="https://cdn.barzahlen.de/images/barzahlen_logo.png" alt="Barzahlen" height="40" class="uc-credit-cctype" />';
-  $description = t('After completing your order you get a payment slip from Barzahlen that you can easily print out or have it sent via SMS to your mobile phone. With the help of that payment slip you can pay your online purchase at one of our retail partners (e.g. supermarket).');
-  $sandbox = t('The <strong>Sandbox Mode</strong> is active. All placed orders receive a test payment slip. Test payment slips cannot be handled by our retail partners.');
-  $payat = t('<strong>Pay at:</strong>&nbsp;');
+function uc_barzahlen_uc_payment_method()
+{
+    $title1 = '<img src="https://cdn.barzahlen.de/images/barzahlen_logo.png" alt="Barzahlen" height="40" class="uc-credit-cctype" />';
+    $description = '<div><img src="https://cdn.barzahlen.de/images/barzahlen_special.png" style="float: right; margin-left: 10px; max-width: 180px; max-height: 180px;">' . t('After completing your order you get a payment slip from Barzahlen that you can easily print out or have it sent via SMS to your mobile phone. With the help of that payment slip you can pay your online purchase at one of our retail partners (e.g. supermarket).') . '</div>';
+    $sandbox = t('The <strong>Sandbox Mode</strong> is active. All placed orders receive a test payment slip. Test payment slips cannot be handled by our retail partners.');
+    $payat = t('<strong>Pay at:</strong>&nbsp;');
 
-  for($i = 1; $i <= 10; $i++) {
-    $count = str_pad($i,2,"0",STR_PAD_LEFT);
-    $payat .= '<img src="https://cdn.barzahlen.de/images/barzahlen_partner_'.$count.'.png" alt="" style="vertical-align: middle; height: 25px;" />';
-  }
+    for ($i = 1; $i <= 10; $i++) {
+        $count = str_pad($i, 2, "0", STR_PAD_LEFT);
+        $payat .= '<img src="https://cdn.barzahlen.de/images/barzahlen_partner_' . $count . '.png" alt="" style="vertical-align: middle; height: 25px;" />';
+    }
 
-  $text = $title1 . '<br />' . $description;
-  if(variable_get('uc_barzahlen_sandbox', false)) {
-    $text .= '<br/><br/>' . $sandbox;
-  }
-  $text .= '<br/><br/>' . $payat;
+    $text = $title1 . '<br />' . $description;
+    if (variable_get('uc_barzahlen_sandbox', false)) {
+        $text .= '<br/><br/>' . $sandbox;
+    }
+    $text .= '<br/><br/>' . $payat;
 
-  $methods[] = array(
-    'id' => 'barzahlen',
-    'name' => t('Barzahlen'),
-    'title' => $text,
-    'review' => t('Barzahlen'),
-    'desc' => t('Barzahlen.'),
-    'callback' => 'uc_payment_method_barzahlen',
-    'weight' => 1,
-    'checkout' => TRUE,
-    'no_gateway' => FALSE,
-  );
+    $methods[] = array(
+        'id' => 'barzahlen',
+        'name' => t('Barzahlen'),
+        'title' => $text,
+        'review' => t('Barzahlen'),
+        'desc' => t('Barzahlen.'),
+        'callback' => 'uc_payment_method_barzahlen',
+        'weight' => 1,
+        'checkout' => TRUE,
+        'no_gateway' => FALSE,
+    );
 
-  return $methods;
+    return $methods;
 }
 
 /**
  * Implements hook_form_FORM_ID_alter() for uc_cart_checkout_review_form().
  */
-function uc_barzahlen_form_uc_cart_checkout_review_form_alter(&$form, &$form_state, $form_id) {
-  $form['#submit'][] = 'uc_barzahlen_submit_form_submit';
+function uc_barzahlen_form_uc_cart_checkout_review_form_alter(&$form, &$form_state, $form_id)
+{
+    $form['#submit'][] = 'uc_barzahlen_submit_form_submit';
 }
 
-function uc_barzahlen_submit_form_submit($form, &$form_state) {
-  $order = uc_order_load($_SESSION['cart_order']);
+function uc_barzahlen_submit_form_submit($form, &$form_state)
+{
+    $order = uc_order_load($_SESSION['cart_order']);
 
-  $shopId = variable_get('uc_barzahlen_shopid');
-  $paymentKey = variable_get('uc_barzahlen_paymentkey');
-  $sandbox = variable_get('uc_barzahlen_sandbox');
-  $api = new Barzahlen_Api($shopId, $paymentKey, $sandbox);
-  $api->setDebug(variable_get('uc_barzahlen_debug', false));
+    $shopId = variable_get('uc_barzahlen_shopid');
+    $paymentKey = variable_get('uc_barzahlen_paymentkey');
+    $sandbox = variable_get('uc_barzahlen_sandbox');
+    $api = new Barzahlen_Api($shopId, $paymentKey, $sandbox);
+    $api->setDebug(variable_get('uc_barzahlen_debug', false));
 
-  $billing_country = uc_get_country_data(array('country_id' => $order->billing_country));
+    $billing_country = uc_get_country_data(array('country_id' => $order->billing_country));
 
-  $customerEmail = $order->primary_email;
-  $customerStreetNr = $order->billing_street1;
-  $customerZipcode = $order->billing_postal_code;
-  $customerCity = $order->billing_city;
-  $customerCountry = $billing_country[0]['country_iso_code_2'];
-  $amount = $order->order_total;
-  $currency = $order->currency;
-  $orderId = $order->order_id;
-  $payment = new Barzahlen_Request_Payment($customerEmail, $customerStreetNr, $customerZipcode, $customerCity, $customerCountry, $amount, $currency, $orderId);
+    $customerEmail = $order->primary_email;
+    $customerStreetNr = $order->billing_street1;
+    $customerZipcode = $order->billing_postal_code;
+    $customerCity = $order->billing_city;
+    $customerCountry = $billing_country[0]['country_iso_code_2'];
+    $amount = $order->order_total;
+    $currency = $order->currency;
+    $orderId = $order->order_id;
+    $payment = new Barzahlen_Request_Payment($customerEmail, $customerStreetNr, $customerZipcode, $customerCity, $customerCountry, $amount, $currency, $orderId);
 
-  try {
-    $api->handleRequest($payment);
-  }
-  catch(Exception $e) {
-    watchdog('uc_barzahlen', $e, array(), WATCHDOG_ERROR);
-  }
+    try {
+        $api->handleRequest($payment);
+    } catch (Exception $e) {
+        watchdog('uc_barzahlen', $e, array(), WATCHDOG_ERROR);
+    }
 
-  if($payment->isValid()) {
+    if ($payment->isValid()) {
 
-    db_insert('uc_payment_barzahlen_transactions')
-        ->fields(array(
-          'transaction_id' => $payment->getTransactionId(),
-          'order_id' => $order->order_id,
-        ))
-        ->execute();
+        db_insert('uc_payment_barzahlen_transactions')
+                ->fields(array(
+                    'transaction_id' => $payment->getTransactionId(),
+                    'order_id' => $order->order_id,
+                ))
+                ->execute();
 
-    variable_set('uc_cart_checkout_complete_page', 'uc_barzahlen/complete');
-    variable_set('barzahlen_infotext1', $payment->getInfotext1());
-    variable_set('barzahlen_order_id', $orderId);
-    $form_state['redirect'] = 'cart/checkout/complete';
-  }
-  else {
-    drupal_set_message(t('Payment via Barzahlen was unfortunately not possible. Please try again or select another payment method.'), 'error');
-    $form_state['redirect'] = 'cart/checkout';
-  }
+        variable_set('uc_cart_checkout_complete_page', 'uc_barzahlen/complete');
+        variable_set('barzahlen_infotext1', $payment->getInfotext1());
+        variable_set('barzahlen_order_id', $orderId);
+        $form_state['redirect'] = 'cart/checkout/complete';
+    } else {
+        drupal_set_message(t('Payment via Barzahlen was unfortunately not possible. Please try again or select another payment method.'), 'error');
+        $form_state['redirect'] = 'cart/checkout';
+    }
 }
 
 /**
  * Handles the Barzahlen payment method.
  */
-function uc_payment_method_barzahlen($op, &$order) {
+function uc_payment_method_barzahlen($op, &$order)
+{
+    switch ($op) {
 
-  switch ($op) {
+        case 'order-view':
+            $result = db_query("SELECT * FROM {uc_payment_barzahlen_transactions} WHERE order_id = :id LIMIT 1", array(':id' => $order->order_id))->fetchObject();
+            if (empty($result->transaction_id)) {
+                $transaction = t('Unknown');
+            } else {
+                $transaction = $result->transaction_id . ' (' . t($result->transaction_state) . ')';
+            }
 
-    case 'order-view':
-      $result = db_query("SELECT * FROM {uc_payment_barzahlen_transactions} WHERE order_id = :id LIMIT 1", array(':id' => $order->order_id))->fetchObject();
-      if(empty($result->transaction_id)) {
-        $transaction = t('Unknown');
-      }
-      else {
-        $transaction = $result->transaction_id . ' ('. t($result->transaction_state) .')';
-      }
+            $build['#markup'] = t('Transaction ID:<br />@transaction', array('@transaction' => $transaction));
+            return $build;
 
-      $build['#markup'] = t('Transaction ID:<br />@transaction', array('@transaction' => $transaction));
-      return $build;
+        case 'settings':
+            $form['uc_barzahlen_sandbox'] = array(
+                '#type' => 'checkbox',
+                '#title' => t('Sandbox'),
+                '#description' => t('Activate the test mode to process Barzahlen payments via sandbox.'),
+                '#default_value' => variable_get('uc_barzahlen_sandbox', FALSE),
+            );
+            $form['uc_barzahlen_shopid'] = array(
+                '#type' => 'textfield',
+                '#title' => t('Shop ID'),
+                '#description' => t('Your Barzahlen Shop ID (<a href="https://partner.barzahlen.de" target="_blank">https://partner.barzahlen.de</a>)'),
+                '#default_value' => variable_get('uc_barzahlen_shopid', ''),
+            );
+            $form['uc_barzahlen_paymentkey'] = array(
+                '#type' => 'textfield',
+                '#title' => t('Payment Key'),
+                '#description' => t('Your Barzahlen Payment Key (<a href="https://partner.barzahlen.de" target="_blank">https://partner.barzahlen.de</a>)'),
+                '#default_value' => variable_get('uc_barzahlen_paymentkey', ''),
+            );
+            $form['uc_barzahlen_notificationkey'] = array(
+                '#type' => 'textfield',
+                '#title' => t('Notification Key'),
+                '#description' => t('Your Barzahlen Notification Key (<a href="https://partner.barzahlen.de" target="_blank">https://partner.barzahlen.de</a>)'),
+                '#default_value' => variable_get('uc_barzahlen_notificationkey', ''),
+            );
+            $form['uc_barzahlen_debug'] = array(
+                '#type' => 'checkbox',
+                '#title' => t('Extended Logging'),
+                '#description' => t('Activate debugging for additional logging.'),
+                '#default_value' => variable_get('uc_barzahlen_debug', FALSE),
+            );
 
-    case 'settings':
-      $form['uc_barzahlen_sandbox'] = array(
-        '#type' => 'checkbox',
-        '#title' => t('Sandbox'),
-        '#description' => t('Activate the test mode to process Barzahlen payments via sandbox.'),
-        '#default_value' => variable_get('uc_barzahlen_sandbox', FALSE),
-      );
-      $form['uc_barzahlen_shopid'] = array(
-        '#type' => 'textfield',
-        '#title' => t('Shop ID'),
-        '#description' => t('Your Barzahlen Shop ID (<a href="https://partner.barzahlen.de" target="_blank">https://partner.barzahlen.de</a>)'),
-        '#default_value' => variable_get('uc_barzahlen_shopid', ''),
-      );
-      $form['uc_barzahlen_paymentkey'] = array(
-        '#type' => 'textfield',
-        '#title' => t('Payment Key'),
-        '#description' => t('Your Barzahlen Payment Key (<a href="https://partner.barzahlen.de" target="_blank">https://partner.barzahlen.de</a>)'),
-        '#default_value' => variable_get('uc_barzahlen_paymentkey', ''),
-      );
-      $form['uc_barzahlen_notificationkey'] = array(
-        '#type' => 'textfield',
-        '#title' => t('Notification Key'),
-        '#description' => t('Your Barzahlen Notification Key (<a href="https://partner.barzahlen.de" target="_blank">https://partner.barzahlen.de</a>)'),
-        '#default_value' => variable_get('uc_barzahlen_notificationkey', ''),
-      );
-      $form['uc_barzahlen_debug'] = array(
-        '#type' => 'checkbox',
-        '#title' => t('Extended Logging'),
-        '#description' => t('Activate debugging for additional logging.'),
-        '#default_value' => variable_get('uc_barzahlen_debug', FALSE),
-      );
-
-      return $form;
-  }
+            return $form;
+    }
 }

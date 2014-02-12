@@ -6,7 +6,7 @@ Barzahlen Payment Module (Ubercart)
 http://www.barzahlen.de
 
 ==Current Version==
-1.0.1
+1.0.2
 
 ==User Manual==
 http://www.barzahlen.de/partner/integration/shopsysteme/13/ubercart
