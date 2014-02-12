@@ -52,14 +52,14 @@ function uc_barzahlen_menu() {
  * Implements hook_uc_payment_method().
  */
 function uc_barzahlen_uc_payment_method() {
-  $title1 = '<img src="http://cdn.barzahlen.de/images/barzahlen_logo.png" alt="Barzahlen" height="40" class="uc-credit-cctype" />';
+  $title1 = '<img src="https://cdn.barzahlen.de/images/barzahlen_logo.png" alt="Barzahlen" height="40" class="uc-credit-cctype" />';
   $description = t('After completing your order you get a payment slip from Barzahlen that you can easily print out or have it sent via SMS to your mobile phone. With the help of that payment slip you can pay your online purchase at one of our retail partners (e.g. supermarket).');
   $sandbox = t('The <strong>Sandbox Mode</strong> is active. All placed orders receive a test payment slip. Test payment slips cannot be handled by our retail partners.');
   $payat = t('<strong>Pay at:</strong>&nbsp;');
 
   for($i = 1; $i <= 10; $i++) {
     $count = str_pad($i,2,"0",STR_PAD_LEFT);
-    $payat .= '<img src="http://cdn.barzahlen.de/images/barzahlen_partner_'.$count.'.png" alt="" style="vertical-align: middle; height: 25px;" />';
+    $payat .= '<img src="https://cdn.barzahlen.de/images/barzahlen_partner_'.$count.'.png" alt="" style="vertical-align: middle; height: 25px;" />';
   }
 
   $text = $title1 . '<br />' . $description;
